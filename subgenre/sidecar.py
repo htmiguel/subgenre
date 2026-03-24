@@ -5,29 +5,42 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
-SIDECAR_SUFFIX = ".music-organizer.json"
+SIDECAR_SUFFIX = ".subgenre.json"
+LEGACY_SIDECAR_SUFFIX = ".music-organizer.json"
 
 
 def sidecar_path(audio_path: Path) -> Path:
-    """Sidecar lives next to the audio file: `track.flac` -> `track.music-organizer.json`."""
+    """Sidecar next to audio: `track.flac` -> `track.subgenre.json`."""
     return audio_path.with_name(audio_path.stem + SIDECAR_SUFFIX)
 
 
+def _legacy_sidecar_path(audio_path: Path) -> Path:
+    return audio_path.with_name(audio_path.stem + LEGACY_SIDECAR_SUFFIX)
+
+
 def load_sidecar(audio_path: Path) -> dict[str, Any]:
-    p = sidecar_path(audio_path)
-    if not p.is_file():
-        return {}
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+    for p in (sidecar_path(audio_path), _legacy_sidecar_path(audio_path)):
+        if not p.is_file():
+            continue
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except (OSError, json.JSONDecodeError):
+            continue
+    return {}
 
 
 def save_sidecar(audio_path: Path, data: dict[str, Any]) -> None:
     p = sidecar_path(audio_path)
     out = {"schema_version": SCHEMA_VERSION, **data}
     p.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    leg = _legacy_sidecar_path(audio_path)
+    if leg.is_file() and leg.resolve() != p.resolve():
+        try:
+            leg.unlink()
+        except OSError:
+            pass
 
 
 def deep_merge(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:

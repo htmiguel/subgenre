@@ -3,11 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from music_organizer.audio_info import analyze_file
-from music_organizer.features_local import analyze_local
-from music_organizer.sidecar import deep_merge, load_sidecar, save_sidecar
-from music_organizer.spotify_audio import fetch_spotify_features
-from music_organizer.tags import has_embedded_cover, read_tags_full
+from subgenre.audio_info import analyze_file
+from subgenre.features_local import analyze_local
+from subgenre.sidecar import deep_merge, load_sidecar, save_sidecar
+from subgenre.config_store import apply_learned_genre_to_track
+from subgenre.spotify_audio import fetch_spotify_features
+from subgenre.tags import has_embedded_cover, read_tags_full
 
 
 def _tags_to_track(tags: dict[str, Any]) -> dict[str, Any]:
@@ -107,12 +108,13 @@ def collect_metadata(path: Path, *, features: bool = True) -> dict[str, Any]:
 
     merged = deep_merge(base, bundle)
     merged = _strip_internal(merged)
+    apply_learned_genre_to_track(merged.setdefault("track", {}))
     save_sidecar(path, merged)
     return merged
 
 
 def scan_tree(root: Path, *, features: bool = True) -> list[Path]:
-    from music_organizer.tags import iter_audio_files
+    from subgenre.tags import iter_audio_files
 
     touched: list[Path] = []
     for p in iter_audio_files(root):

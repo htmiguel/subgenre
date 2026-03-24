@@ -6,12 +6,13 @@ import logging
 import sys
 from pathlib import Path
 
-from music_organizer import __version__
-from music_organizer.enrich import enrich_file, enrich_tree
-from music_organizer.organize import organize_tree
-from music_organizer.scan import scan_tree
-from music_organizer.tags import iter_audio_files, read_tags_full
-from music_organizer.watch_cmd import watch_folder
+from subgenre import __version__
+from subgenre.enrich import enrich_file, enrich_tree
+from subgenre.organize import organize_tree
+from subgenre.scan import scan_tree
+from subgenre.tags import iter_audio_files, read_tags_full
+from subgenre.setup_cmd import run_calibrate_only, run_setup
+from subgenre.watch_cmd import watch_folder
 
 
 def _cmd_scan(args: argparse.Namespace) -> int:
@@ -20,13 +21,13 @@ def _cmd_scan(args: argparse.Namespace) -> int:
     if args.json:
         rows = []
         for p in iter_audio_files(root):
-            from music_organizer.sidecar import load_sidecar
+            from subgenre.sidecar import load_sidecar
 
             rows.append({"path": str(p), **load_sidecar(p)})
         print(json.dumps(rows, indent=2, default=str))
         return 0
     for p in iter_audio_files(root):
-        from music_organizer.sidecar import load_sidecar
+        from subgenre.sidecar import load_sidecar
 
         bundle = load_sidecar(p)
         print(f"{p}\n{json.dumps(bundle, indent=2, default=str)}\n")
@@ -65,8 +66,28 @@ def _cmd_enrich(args: argparse.Namespace) -> int:
 
 
 def _cmd_watch(args: argparse.Namespace) -> int:
-    watch_folder(Path(args.path), debounce_s=float(args.debounce))
+    p = args.path
+    if not p:
+        from subgenre.config_store import get_watch_dir
+
+        wd = get_watch_dir()
+        if not wd:
+            print(
+                "No watch directory configured. Run:  subgenre setup",
+                file=sys.stderr,
+            )
+            return 1
+        path = wd
+    else:
+        path = Path(p).expanduser().resolve()
+    watch_folder(path, debounce_s=float(args.debounce))
     return 0
+
+
+def _cmd_setup(args: argparse.Namespace) -> int:
+    if args.calibrate:
+        return run_calibrate_only()
+    return run_setup()
 
 
 def _cmd_inspect(args: argparse.Namespace) -> int:
@@ -87,7 +108,7 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="music-organizer",
+        prog="subgenre",
         description="Organize by genre / bitrate, enrich from MusicBrainz + Spotify + librosa, watch folder.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -129,9 +150,25 @@ def main(argv: list[str] | None = None) -> int:
         "watch",
         help="Watch a folder; new audio files trigger scan (tags + audio + features) after debounce",
     )
-    p_w.add_argument("path", help="Directory to watch (recursive)")
+    p_w.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help="Directory to watch (default: path from `subgenre setup`)",
+    )
     p_w.add_argument("--debounce", default="2.0", help="Seconds of quiet before processing (default 2)")
     p_w.set_defaults(func=_cmd_watch)
+
+    p_setup = sub.add_parser(
+        "setup",
+        help="Configure watch directory and optional genre calibration (10 random tracks)",
+    )
+    p_setup.add_argument(
+        "--calibrate",
+        action="store_true",
+        help="Only run calibration; uses watch_dir from a previous setup",
+    )
+    p_setup.set_defaults(func=_cmd_setup)
 
     p_in = sub.add_parser("inspect", help="Print embedded tags only (does not write sidecars)")
     p_in.add_argument("path", help="Directory to scan")

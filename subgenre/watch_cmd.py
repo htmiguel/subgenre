@@ -8,8 +8,8 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from music_organizer.scan import collect_metadata
-from music_organizer.tags import AUDIO_EXTENSIONS
+from subgenre.scan import collect_metadata
+from subgenre.tags import AUDIO_EXTENSIONS
 
 log = logging.getLogger(__name__)
 

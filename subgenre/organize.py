@@ -3,10 +3,10 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from music_organizer.audio_info import is_low_quality
-from music_organizer.scan import collect_metadata
-from music_organizer.sidecar import sidecar_path
-from music_organizer.tags import iter_audio_files, safe_path_component
+from subgenre.audio_info import is_low_quality
+from subgenre.scan import collect_metadata
+from subgenre.sidecar import sidecar_path
+from subgenre.tags import iter_audio_files, safe_path_component
 
 
 LOW_QUALITY_FOLDER = "Low Quality"
@@ -48,7 +48,7 @@ def organize_tree(
     for src in iter_audio_files(source):
         collect_metadata(src, features=with_features)
         # Reload bundle from disk after collect_metadata wrote it
-        from music_organizer.sidecar import load_sidecar
+        from subgenre.sidecar import load_sidecar
 
         bundle = load_sidecar(src)
         dst_audio = destination_path(dest, src, bundle)

@@ -3,12 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from music_organizer.audio_info import analyze_file
-from music_organizer.features_local import analyze_local
-from music_organizer.mb import lookup_track_bundle
-from music_organizer.sidecar import deep_merge, load_sidecar, save_sidecar
-from music_organizer.spotify_audio import fetch_spotify_features
-from music_organizer.tags import embed_cover, has_embedded_cover, read_tags_full, write_tags
+from subgenre.audio_info import analyze_file
+from subgenre.config_store import apply_learned_genre_to_track
+from subgenre.features_local import analyze_local
+from subgenre.mb import lookup_track_bundle
+from subgenre.sidecar import deep_merge, load_sidecar, save_sidecar
+from subgenre.spotify_audio import fetch_spotify_features
+from subgenre.tags import embed_cover, has_embedded_cover, read_tags_full, write_tags
 
 
 def _tags_to_track(tags: dict[str, Any]) -> dict[str, Any]:
@@ -145,6 +146,8 @@ def enrich_file(path: Path, *, dry_run: bool = False) -> dict[str, Any]:
     cov = dict(base.get("cover") or {})
     cov["embedded"] = has_embedded_cover(path)
 
+    apply_learned_genre_to_track(track)
+
     bundle = deep_merge(
         base,
         {
@@ -177,7 +180,7 @@ def enrich_file(path: Path, *, dry_run: bool = False) -> dict[str, Any]:
 
 
 def enrich_tree(root: Path, *, dry_run: bool = False) -> list[Path]:
-    from music_organizer.tags import iter_audio_files
+    from subgenre.tags import iter_audio_files
 
     done: list[Path] = []
     for p in iter_audio_files(root):

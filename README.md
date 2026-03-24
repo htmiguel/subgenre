@@ -1,96 +1,88 @@
-# music-organizer
+# subgenre
 
-CLI that keeps a **JSON sidecar** next to each track (`Artist Title.music-organizer.json`), **organizes** into **genre** folders (or **Low Quality** if lossy bitrate is below 256 kbps), **enriches** from **MusicBrainz** + **Cover Art Archive** + optional **Spotify** + optional **librosa**, and can **watch** a folder and auto-run **scan** when new audio appears.
+CLI (`subgenre`, alias **`sg`**) that keeps a **JSON sidecar** next to each track, **organizes** into **genre** folders (or **Low Quality** if lossy bitrate is below 256 kbps), **enriches** from **MusicBrainz** + **Cover Art Archive** + optional **Spotify** + optional **librosa**, **watches** a folder, and can **learn genres** from interactive **setup** calibration.
 
 ## Install
 
+On macOS, use **`python3`** (and **`pip` via `python3 -m pip`**). There is usually **no** `python` command unless you install one.
+
 ```bash
-cd ~/projects/music-organizer
+cd ~/projects/subgenre
+
+# If a previous venv is broken (e.g. `python` / `python3` missing inside the venv), recreate:
+# rm -rf .venv
+
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e .
-# For local tempo/key/spectral-style analysis (EchoNest-ish fallbacks):
-pip install -e ".[audio]"
+.venv/bin/python3 -m pip install -U pip setuptools wheel
+.venv/bin/python3 -m pip install -e .
+.venv/bin/python3 -m pip install -e ".[audio]"   # optional: local tempo/key analysis
 ```
+
+Always call the CLI with the venv interpreter so you never depend on `activate`:
+
+```bash
+.venv/bin/subgenre --help
+.venv/bin/sg --help
+```
+
+### No `python3` at all?
+
+Install Apple’s **Command Line Tools** (includes `/usr/bin/python3`):
+
+```bash
+xcode-select --install
+```
+
+Or install **Python** from [python.org](https://www.python.org/downloads/) or Homebrew (`brew install python`), then use the `python3` / `pip3` from that install to create `.venv` as above.
+
+## Setup & learned genres
+
+First run **setup** to choose the directory to watch and optionally calibrate **10 random** tracks: you see a **proposed genre** (from tags, sidecar, and any prior rules) and can **keep or edit** it. Choices are stored under **`~/.config/subgenre/config.json`** (`genre_by_artist`, `genre_by_artist_album`) and applied on future **`scan`**, **`enrich`**, and **`organize`** (calibration overrides raw tags when present).
+
+```bash
+subgenre setup
+# or
+sg setup
+
+# Re-run only calibration (uses saved watch_dir):
+subgenre setup --calibrate
+```
+
+**Watch** with no path uses the directory from setup:
+
+```bash
+subgenre watch
+```
+
+Config file: `~/.config/subgenre/config.json` (or `$XDG_CONFIG_HOME/subgenre/config.json`).
 
 ## Commands
 
 ### `organize`
 
-1. Refreshes each file’s sidecar from **embedded tags** + **technical audio** (bitrate, lossless, length, …).
-2. Optionally runs **Spotify + librosa** (`--no-features` skips that).
-3. Moves (or `--copy`) into `--dest`:
-
-   - **`Low Quality/`** — lossy codec and `bitrate_kbps < 256` (FLAC/WAV-style lossless is never sent here).
-   - **`<Genre>/`** — from the `genre` field after enrichment/tags (`Unknown Genre` if missing).
-   - Filename: **`Artist - Title.ext`**
-4. Moves the **sidecar** next to the audio file in the new location.
+Moves into `--dest/<Genre|Low Quality>/Artist - Title.ext` (see earlier design). Genre comes from tags + **learned calibration**.
 
 ```bash
-music-organizer organize ~/Downloads/inbox --dest ~/Music/library
-music-organizer organize ~/Downloads/inbox --dest ~/Music/library --copy --no-features
+subgenre organize ~/Downloads/inbox --dest ~/Music/library
+sg organize ~/Downloads/inbox --dest ~/Music/library --copy --no-features
 ```
 
-### `enrich`
+### `enrich` / `scan` / `watch` / `inspect`
 
-When anything important is missing, pulls data from the network and **writes tags + sidecar**:
-
-- **MusicBrainz** — artist, title, album, year, genre (tag), label, recording/release IDs; **label area** from release country or label entity when available.
-- **Cover Art Archive** — front art embedded (MP3/FLAC/M4A).
-- **Spotify Web API** (optional) — danceability, energy, valence, **tempo**, **key**, etc. (needs catalog match).
-
-Set:
+Same behavior as before; use `subgenre` or `sg` as the command name.
 
 ```bash
-export SPOTIFY_CLIENT_ID=...
-export SPOTIFY_CLIENT_SECRET=...
+subgenre scan ~/Music/inbox
+subgenre watch              # uses watch_dir from setup
+subgenre watch ~/Other --debounce 2.0
 ```
 
-- **librosa** (optional extra `.[audio]`) — local **tempo** + **key** estimate and a simple **energy** proxy if Spotify is unavailable.
+## Sidecar
 
-```bash
-music-organizer enrich ~/Music/some-album
-music-organizer enrich ~/Music/track.mp3 --dry-run
-```
-
-Run **`enrich` before `organize`** if you need genre/label/year filled from the web.
-
-### `scan`
-
-Writes/updates the sidecar from **tags + technical audio + Spotify + librosa** — **no MusicBrainz** (use `enrich` for that). Same pipeline the watcher uses.
-
-```bash
-music-organizer scan ~/Music/inbox
-music-organizer scan ~/Music/inbox --no-features
-```
-
-### `watch`
-
-Recursively watches a directory; after **`--debounce`** seconds of quiet (default **2**), each new **audio** file gets **`scan`** (with features if installed).
-
-```bash
-music-organizer watch ~/Music/inbox --debounce 2.0
-```
-
-### `inspect`
-
-Print embedded tags only — **does not** write sidecars.
-
-## Sidecar shape (high level)
-
-- **`track`** — artist, title, album, genre, label, `label_area`, year, ids, BPM, key, …  
-- **`audio`** — `bitrate_kbps`, `lossless`, `length_seconds`, …  
-- **`features`** — Spotify-style metrics when available; librosa **tempo** / **key** / **energy** when not.  
-- **`cover`** — `embedded` flag.  
-- **`sources`** — e.g. `tags`, `musicbrainz`, `spotify`, `librosa`.
-
-## Git
-
-The **`main`** branch includes the full pipeline (merged from `music-organizer`). Use `git branch` to confirm.
+Metadata JSON next to each track: **`*.subgenre.json`**. Older libraries may still have **`*.music-organizer.json`**; the tool reads both and removes the legacy file after the next save.
 
 ## Notes
 
-- **Spotify** features need a **matching track** in Spotify’s catalog; local-only files still get **librosa** when the extra is installed.
-- **librosa** loading of some formats may need **ffmpeg** on your PATH.
-- Be polite: MusicBrainz is rate-limited; bulk `enrich` is intentionally throttled.
+- **Spotify** requires `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` for catalog features.
+- **librosa** may need **ffmpeg** for some formats.
+- MusicBrainz is rate-limited.

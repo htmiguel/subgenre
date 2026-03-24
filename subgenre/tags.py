@@ -145,7 +145,7 @@ def iter_audio_files(root: Path) -> list[Path]:
         if _path_skipped(p):
             continue
         if p.is_file() and p.suffix.lower() in AUDIO_EXTENSIONS:
-            if p.name.endswith(".music-organizer.json"):
+            if p.name.endswith((".subgenre.json", ".music-organizer.json")):
                 continue
             out.append(p)
     return out

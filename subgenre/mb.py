@@ -6,9 +6,9 @@ from typing import Any
 import musicbrainzngs
 import requests
 
-_USER_AGENT_NAME = "music-organizer"
-_USER_AGENT_VERSION = "0.2.0"
-_USER_AGENT_URL = "https://github.com/local/music-organizer"
+_USER_AGENT_NAME = "subgenre"
+_USER_AGENT_VERSION = "0.4.0"
+_USER_AGENT_URL = "https://github.com/local/subgenre"
 
 _MB_DELAY = 1.05
 
