@@ -87,7 +87,7 @@ Print embedded tags only — **does not** write sidecars.
 
 ## Git
 
-Feature work lives on branch **`music-organizer`** (see `git branch`).
+The **`main`** branch includes the full pipeline (merged from `music-organizer`). Use `git branch` to confirm.
 
 ## Notes
 

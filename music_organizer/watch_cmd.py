@@ -14,6 +14,26 @@ from music_organizer.tags import AUDIO_EXTENSIONS
 log = logging.getLogger(__name__)
 
 
+def _wait_until_file_stable(path: Path, *, interval: float = 0.45, max_wait: float = 60.0) -> bool:
+    """Wait until two consecutive stat() calls report the same non-zero size (copy finished)."""
+    deadline = time.monotonic() + max_wait
+    prev: int | None = None
+    while time.monotonic() < deadline:
+        try:
+            sz = path.stat().st_size
+        except OSError:
+            time.sleep(interval)
+            continue
+        if prev is not None and sz == prev and sz > 0:
+            return True
+        prev = sz
+        time.sleep(interval)
+    try:
+        return path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
 class _AudioHandler(FileSystemEventHandler):
     def __init__(self, debounce_s: float = 2.0) -> None:
         self.debounce_s = debounce_s
@@ -41,6 +61,9 @@ class _AudioHandler(FileSystemEventHandler):
             if not p.is_file():
                 continue
             if p.suffix.lower() not in AUDIO_EXTENSIONS:
+                continue
+            if not _wait_until_file_stable(p):
+                log.warning("Skipping (file not ready or empty): %s", p)
                 continue
             try:
                 collect_metadata(p, features=True)

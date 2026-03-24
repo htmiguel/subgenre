@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import re
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,8 @@ from mutagen.flac import FLAC, Picture
 from mutagen.id3 import APIC, ID3, TALB, TBPM, TDRC, TIT2, TKEY, TPE1, TPUB, TCON
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover
+from mutagen.oggopus import OggOpus
+from mutagen.oggvorbis import OggVorbis
 
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".m4a", ".mp4", ".ogg", ".opus", ".wav", ".aac", ".wma"}
 
@@ -182,6 +185,19 @@ def embed_cover(path: Path, image_bytes: bytes, mime: str = "image/jpeg") -> Non
         fmt = MP4Cover.FORMAT_JPEG if "jpeg" in mime else MP4Cover.FORMAT_PNG
         audio.tags["covr"] = [MP4Cover(image_bytes, imageformat=fmt)]
         audio.save()
+    elif ext in (".ogg", ".opus"):
+        pic = Picture()
+        pic.type = 3
+        pic.mime = mime
+        pic.desc = "Cover"
+        pic.data = image_bytes
+        b64 = base64.b64encode(pic.write()).decode("ascii")
+        if ext == ".opus":
+            audio = OggOpus(path)
+        else:
+            audio = OggVorbis(path)
+        audio["METADATA_BLOCK_PICTURE"] = [b64]
+        audio.save()
     else:
         raise NotImplementedError(f"Cover embedding not implemented for {ext}")
 
@@ -262,6 +278,28 @@ def write_tags(path: Path, fields: dict[str, Any]) -> None:
         if label:
             t["\xa9grp"] = [str(label)]
         audio.save()
+    elif ext in (".ogg", ".opus"):
+        if ext == ".opus":
+            audio = OggOpus(path)
+        else:
+            audio = OggVorbis(path)
+        if title:
+            audio["TITLE"] = str(title)
+        if artist:
+            audio["ARTIST"] = str(artist)
+        if album:
+            audio["ALBUM"] = str(album)
+        if genre:
+            audio["GENRE"] = str(genre)
+        if date:
+            audio["DATE"] = str(date)[:4]
+        if bpm is not None:
+            audio["BPM"] = str(int(float(bpm)))
+        if key:
+            audio["INITIALKEY"] = str(key)
+        if label:
+            audio["ORGANIZATION"] = str(label)
+        audio.save()
     else:
         # Fallback: easy tags where mutagen supports them
         audio = MutagenFile(path, easy=True)
@@ -292,6 +330,12 @@ def has_embedded_cover(path: Path) -> bool:
         if ext in (".m4a", ".mp4"):
             mp = MP4(path)
             return bool(mp.tags and mp.tags.get("covr"))
+        if ext in (".ogg", ".opus"):
+            if ext == ".opus":
+                o = OggOpus(path)
+            else:
+                o = OggVorbis(path)
+            return bool(o.get("METADATA_BLOCK_PICTURE"))
     except Exception:
         return False
     return False
