@@ -4,7 +4,31 @@ CLI (`subgenre`, alias **`sg`**) that keeps a **JSON sidecar** next to each trac
 
 ## Install
 
-On macOS, use **`python3`** (and **`pip` via `python3 -m pip`**). There is usually **no** `python` command unless you install one.
+On macOS, install **Python with Homebrew** (do not rely on Xcode or Apple Command Line Tools as your main Python source).
+
+### Prerequisites
+
+1. **[Homebrew](https://brew.sh/)** — if it is not installed yet:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Follow the post-install notes (e.g. add Homebrew to your `PATH` on Apple Silicon).
+
+2. **Python 3**:
+
+```bash
+brew install python
+```
+
+Use `python3` and `python3 -m pip` from this install (or from [python.org](https://www.python.org/downloads/) if you prefer an installer). There is often **no** bare `python` on PATH unless you configure it.
+
+3. **Optional**
+   - **ffmpeg** — recommended if you use the `[audio]` extras (`librosa`), for formats that need decoding: `brew install ffmpeg`
+   - **Node.js** — not required for subgenre; install only if you want it for other tooling: `brew install node`
+
+### Project venv
 
 ```bash
 cd ~/projects/subgenre
@@ -24,16 +48,6 @@ Always call the CLI with the venv interpreter so you never depend on `activate`:
 .venv/bin/subgenre --help
 .venv/bin/sg --help
 ```
-
-### No `python3` at all?
-
-Install Apple’s **Command Line Tools** (includes `/usr/bin/python3`):
-
-```bash
-xcode-select --install
-```
-
-Or install **Python** from [python.org](https://www.python.org/downloads/) or Homebrew (`brew install python`), then use the `python3` / `pip3` from that install to create `.venv` as above.
 
 ## Setup & learned genres
 
