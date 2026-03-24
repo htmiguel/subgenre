@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Bootstrap-on-first-run launcher: ensures .venv exists and deps match pyproject.toml, then runs the real CLI.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV="$ROOT/.venv"
+PYPROJECT="$ROOT/pyproject.toml"
+STAMP="$VENV/.subgenre-bootstrap-stamp"
+CMD="$(basename "${0}")"
+
+_fingerprint() {
+  local h=""
+  if [[ -f "$PYPROJECT" ]]; then
+    if command -v shasum &>/dev/null; then
+      h="$(shasum -a 256 "$PYPROJECT")"
+    elif command -v sha256sum &>/dev/null; then
+      h="$(sha256sum "$PYPROJECT")"
+    else
+      h="$(stat -f "%z %m" "$PYPROJECT" 2>/dev/null || stat -c "%s %Y" "$PYPROJECT")"
+    fi
+  else
+    h="missing-pyproject"
+  fi
+  # Changing extras or toggling audio requires a reinstall
+  echo "${h}|audio=${SUBGENRE_INSTALL_AUDIO:-0}"
+}
+
+_pick_python() {
+  local c
+  for c in python3.14 python3.13 python3.12 python3.11 python3; do
+    if command -v "$c" &>/dev/null; then
+      if "$c" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+        echo "$c"
+        return 0
+      fi
+    fi
+  done
+  echo "subgenre: need Python 3.11+ on PATH (e.g. brew install python)." >&2
+  return 1
+}
+
+_venv_ok() {
+  [[ -x "$VENV/bin/python" ]] || return 1
+  "$VENV/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null || return 1
+  "$VENV/bin/python" -c 'import subgenre' 2>/dev/null || return 1
+  return 0
+}
+
+_need_bootstrap() {
+  [[ ! -d "$VENV" ]] && return 0
+  ! _venv_ok && return 0
+  [[ ! -x "$VENV/bin/$CMD" ]] && return 0
+  [[ ! -f "$STAMP" ]] && return 0
+  [[ "$(_fingerprint)" != "$(cat "$STAMP" 2>/dev/null)" ]] && return 0
+  return 1
+}
+
+_bootstrap() {
+  local py
+  py="$(_pick_python)" || exit 1
+  echo "subgenre: setting up virtualenv (one-time or after dependency changes)…" >&2
+  if [[ -d "$VENV" ]] && ! _venv_ok; then
+    echo "subgenre: removing broken .venv and recreating…" >&2
+    rm -rf "$VENV"
+  fi
+  if [[ ! -d "$VENV" ]]; then
+    "$py" -m venv "$VENV"
+  fi
+  "$VENV/bin/python" -m pip install -U pip setuptools wheel -q
+  if [[ "${SUBGENRE_INSTALL_AUDIO:-}" == "1" ]]; then
+    "$VENV/bin/python" -m pip install -q -e "$ROOT[audio]"
+  else
+    "$VENV/bin/python" -m pip install -q -e "$ROOT"
+  fi
+  _fingerprint >"$STAMP"
+  echo "subgenre: ready." >&2
+}
+
+if _need_bootstrap; then
+  _bootstrap
+fi
+
+exec "$VENV/bin/$CMD" "$@"
