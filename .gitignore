@@ -16,3 +16,6 @@ __pycache__/
 
 # Root markdown docs
 /*.md
+
+# Keep the repo README committed
+!/README.md
